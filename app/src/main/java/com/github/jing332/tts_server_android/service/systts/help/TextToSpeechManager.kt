@@ -391,8 +391,14 @@ class TextToSpeechManager(val context: Context) : ITextToSpeechSynthesizer<IText
         if (ttsId == -1L) {
             mBgmPlayer?.play()
             onStart(audioFormat.sampleRate, audioFormat.bitRate)
-            synthesizeText(replaced, sysRate, sysPitch) { data -> // 音频获取完毕
-                data.receiver(sysRate, sysPitch, audioFormat, onPcmAudio)
+            try {
+                synthesizeText(replaced, sysRate, sysPitch) { data -> // 音频获取完毕
+                    data.receiver(sysRate, sysPitch, audioFormat, onPcmAudio)
+                }
+            } catch (e: Exception) {
+                synthesizeText(replaced, sysRate, sysPitch) { data -> // 音频获取完毕
+                    data.receiver(sysRate, sysPitch, audioFormat, onPcmAudio)
+                }
             }
         } else {
             val specifiedTts = appDb.systemTtsDao.getTts(ttsId)
@@ -416,17 +422,23 @@ class TextToSpeechManager(val context: Context) : ITextToSpeechSynthesizer<IText
                 )
             }
             onStart(specifiedTts.tts.audioFormat.sampleRate, specifiedTts.tts.audioFormat.bitRate)
-            synthesizeText(specifiedTts.tts, text, sysRate, sysPitch) {
-                it.receiver(sysRate, sysPitch, it.txtTts.tts.audioFormat, onPcmAudio)
+            try {
+                synthesizeText(specifiedTts.tts, text, sysRate, sysPitch) {
+                    it.receiver(sysRate, sysPitch, it.txtTts.tts.audioFormat, onPcmAudio)
+                }
+            } catch (e: Exception) {
+                synthesizeText(specifiedTts.tts, text, sysRate, sysPitch) {
+                    it.receiver(sysRate, sysPitch, it.txtTts.tts.audioFormat, onPcmAudio)
+                }
             }
         }
-
 
         isSynthesizing = false
     }
 
     @SuppressLint("WrongConstant")
-    @OptIn(UnstableApi::class) private suspend fun AudioData<ITextToSpeechEngine>.receiver(
+    @OptIn(UnstableApi::class)
+    private suspend fun AudioData<ITextToSpeechEngine>.receiver(
         sysRate: Int,
         sysPitch: Int,
         audioFormat: BaseAudioFormat,
@@ -459,7 +471,8 @@ class TextToSpeechManager(val context: Context) : ITextToSpeechSynthesizer<IText
                     volume = audioParams.volume
                     speed = audioParams.speed
                     pitch = audioParams.pitch
-                    rate = srcSampleRate.toFloat() / targetSampleRate.toFloat() }
+                    rate = srcSampleRate.toFloat() / targetSampleRate.toFloat()
+                }
 
             txtTts.playAudio(
                 sysRate, sysPitch, data.audio,
@@ -474,6 +487,7 @@ class TextToSpeechManager(val context: Context) : ITextToSpeechSynthesizer<IText
                     } else {
                         onPcmAudio.invoke(out)
                     }
+                    data.audio?.inputStream?.close()
                     data.done.invoke()
                 })
             { pcmAudio ->

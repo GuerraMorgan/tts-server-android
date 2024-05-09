@@ -18,12 +18,14 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
+import java.io.FilterInputStream
 import java.io.InputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class EdgeTtsWS : WebSocketListener() {
     companion object {
@@ -65,7 +67,7 @@ class EdgeTtsWS : WebSocketListener() {
 
         connect(req)
         while (isActive) {
-            delay(50)
+            delay(10)
             when (connectStatus) {
                 Status.Opened -> return@withIO true
                 is Status.Failure ->
@@ -81,6 +83,7 @@ class EdgeTtsWS : WebSocketListener() {
     }
 
     private var outputStream: PipedOutputStream? = null
+    private var gotCompleteAudio: AtomicBoolean = AtomicBoolean(false)
     suspend fun getAudio(
         text: String,
         voice: String,
@@ -93,6 +96,7 @@ class EdgeTtsWS : WebSocketListener() {
     suspend fun getAudio(ssml: String, format: String): InputStream = coroutineScope {
         uuid = UUID.randomUUID().toString(true)
         outputStream = PipedOutputStream()
+        gotCompleteAudio.set(false)
 
         if (connectStatus != Status.Opened) connectSync()
 
@@ -120,7 +124,14 @@ class EdgeTtsWS : WebSocketListener() {
             }
         }
 
-        return@coroutineScope PipedInputStream(outputStream)
+        return@coroutineScope object: FilterInputStream(PipedInputStream(outputStream)) {
+            override fun close() {
+                super.close()
+                if (!gotCompleteAudio.get()) {
+                    throw Exception("audio was not complete")
+                }
+            }
+        }
     }
 
     /**
@@ -214,6 +225,7 @@ class EdgeTtsWS : WebSocketListener() {
 
         if (text.contains("Path:turn.end")) {
             Log.d(TAG, "turn.end")
+            gotCompleteAudio.set(true)
             outputStream?.close()
             outputStream = null
         } else if (text.contains("Path:turn.start")) {
