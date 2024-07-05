@@ -65,11 +65,12 @@ class SpeechRuleManagerActivity : AppCompatActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
 
-        if (intent != null) importJsCodeFromIntent(intent)
+        importJsCodeFromIntent(intent)
     }
+
 
     private fun importJsCodeFromIntent(intent: Intent) {
         jsCode = intent.getStringExtra("js") ?: return

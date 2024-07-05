@@ -1,5 +1,7 @@
 -keepattributes SourceFile,LineNumberTable
 
+-keep class androidx.compose.ui.platform.AndroidCompositionLocals_androidKt { *; }
+
 # Rhino
 -keep class javax.script.** { *; }
 -keep class com.sun.script.javascript.** { *; }
